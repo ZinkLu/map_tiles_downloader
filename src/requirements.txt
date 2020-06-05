@@ -1,0 +1,4 @@
+Pillow==7.1.2
+sanic
+tornado
+aiofile

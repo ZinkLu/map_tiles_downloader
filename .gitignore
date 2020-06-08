@@ -1,5 +1,5 @@
-src/output/
-src/temp/
+output/
+temp/
 .idea/
 
 # Byte-compiled / optimized / DLL files

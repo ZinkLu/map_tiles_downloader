@@ -1,6 +1,6 @@
 import mimetypes
 import os
-import threading
+# import threading
 import uuid
 
 from aiofile import AIOFile
@@ -13,7 +13,16 @@ from mbtiles_writer import MbtilesWriter
 from repo_writer import RepoWriter
 from utils import async_download_file_scaled, ensure_base_dir
 
-lock = threading.Lock()  # TODO: 移除lock
+
+class DummyLock:
+    def acquire(self):
+        return
+
+    def release(self):
+        return
+
+
+lock = DummyLock()  # TODO: 移除lock
 
 HANDLERS = dict(
     mbtiles=MbtilesWriter,
@@ -40,19 +49,13 @@ async def static(_: Request):
     file = os.path.join("./UI/", "index.htm")
     mime = mimetypes.MimeTypes().guess_type(file)[0]
 
-    # request.send_header("Access-Control-Allow-Origin", "*")
-
     async with AIOFile(file, "rb") as f:
         return HTTPResponse(await f.read(), headers={"Content-Type": mime or ""})
 
 
 @app.route("/start-download", methods=frozenset({"POST"}))
 async def start(request: Request):
-    headers = request.headers
     forms = request.form
-
-    headers['boundary'] = bytes(headers['boundary'], "utf-8")
-    headers['CONTENT-LENGTH'] = int(request.headers.get('Content-length'))
 
     output_type = forms['outputType'][0]
     output_scale = int(forms['outputScale'][0])
@@ -92,23 +95,19 @@ async def start(request: Request):
 
 @app.route("/end-download", methods=frozenset({"POST"}))
 async def end(request: Request):
-    headers = request.headers
     forms = request.form
 
-    headers['boundary'] = bytes(headers['boundary'], "utf-8")
-    headers['CONTENT-LENGTH'] = int(headers.get('Content-length'))
-
     output_type = forms['outputType'][0]
-    output_scale = int(forms['outputScale'][0])
+    # output_scale = int(forms['outputScale'][0])
     output_directory = forms['outputDirectory'][0]
     output_file = forms['outputFile'][0]
     min_zoom = int(forms['minZoom'][0])
     max_zoom = int(forms['maxZoom'][0])
     timestamp = int(forms['timestamp'][0])
     bounds = forms['bounds'][0]
-    bounds_array = map(float, bounds.split(","))
+    # bounds_array = map(float, bounds.split(","))
     center = forms['center'][0]
-    center_array = map(float, center.split(","))
+    # center_array = map(float, center.split(","))
 
     replace_map = {
         "timestamp": str(timestamp),
@@ -134,11 +133,7 @@ async def end(request: Request):
 
 @app.route("/download-tile", methods=frozenset({"POST"}))
 async def down(request: Request):
-    headers = request.headers
     forms = request.form
-
-    headers['boundary'] = bytes(headers['boundary'], "utf-8")
-    headers['CONTENT-LENGTH'] = int(headers.get('Content-length'))
 
     x = int(forms['x'][0])
     y = int(forms['y'][0])

@@ -7,38 +7,27 @@ class FileWriter:
     slicer = None
 
     @staticmethod
-    def ensureDirectory(lock, directory):
+    def ensure_directory(lock, directory):
         # 去除了lock, 看一下会不会有问题
-        try:
-
-            if not os.path.exists('temp'):
-                os.makedirs('temp', exist_ok=True)
-
-            if not os.path.exists('output'):
-                os.makedirs('output', exist_ok=True)
-
-            os.makedirs(directory, exist_ok=True)
-
-        finally:
-            pass
+        os.makedirs(directory, exist_ok=True)
         return directory
 
     @staticmethod
-    def addMetadata(lock, path, file, name, description, format, bounds, center, minZoom, maxZoom, profile="mercator",
-                    tileSize=256):
+    def add_metadata(lock, path, file, name, description, tile_format, bounds, center, min_zoom, max_zoom,
+                     profile="mercator", tile_size=256):
 
-        FileWriter.ensureDirectory(lock, path)
+        FileWriter.ensure_directory(lock, path)
 
         data = [
             ("name", name),
             ("description", description),
-            ("format", format),
+            ("format", tile_format),
             ("bounds", ','.join(map(str, bounds))),
             ("center", ','.join(map(str, center))),
-            ("minzoom", minZoom),
-            ("maxzoom", maxZoom),
+            ("minzoom", min_zoom),
+            ("maxzoom", max_zoom),
             ("profile", profile),
-            ("tilesize", str(tileSize)),
+            ("tilesize", str(tile_size)),
             ("scheme", "xyz"),
             ("generator", "EliteMapper by Visor Dynamics"),
             ("type", "overlay"),
@@ -51,20 +40,18 @@ class FileWriter:
         return
 
     @staticmethod
-    def addTile(lock, filePath, sourcePath, x, y, z, outputScale):
+    def add_tile(lock, file_path, source_path, x, y, z, outputScale):
 
-        fileDirectory = os.path.dirname(filePath)
-        FileWriter.ensureDirectory(lock, fileDirectory)
-
-        shutil.copyfile(sourcePath, filePath)
-
+        file_directory = os.path.dirname(file_path)
+        FileWriter.ensure_directory(lock, file_directory)
+        shutil.copyfile(source_path, file_path)
         return
 
     @staticmethod
-    def exists(filePath, x, y, z):
-        return os.path.isfile(filePath)
+    def exists(file_path, x, y, z):
+        return os.path.isfile(file_path)
 
     @staticmethod
-    def close(lock, path, file, minZoom, maxZoom):
+    def close(lock, path, file, min_zoom, max_zoom):
         # TODO recalculate bounds and center
         return

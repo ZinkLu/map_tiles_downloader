@@ -1,4 +1,3 @@
-import cgi
 import mimetypes
 import os
 import threading
@@ -12,22 +11,23 @@ from sanic.response import HTTPResponse, json
 from file_writer import FileWriter
 from mbtiles_writer import MbtilesWriter
 from repo_writer import RepoWriter
-from utils import Utils
+from utils import async_download_file_scaled, ensure_base_dir
 
-lock = threading.Lock()
+lock = threading.Lock()  # TODO: 移除lock
+
+HANDLERS = dict(
+    mbtiles=MbtilesWriter,
+    repo=RepoWriter,
+    directory=FileWriter,
+)
 
 
-def randomString():
+def random_string():
     return uuid.uuid4().hex.upper()[0:6]
 
 
-def writerByType(type):
-    if (type == "mbtiles"):
-        return MbtilesWriter
-    elif (type == "repo"):
-        return RepoWriter
-    elif (type == "directory"):
-        return FileWriter
+def writer_by_type(_type):
+    return HANDLERS.get(_type)
 
 
 app = Sanic(__name__)
@@ -36,7 +36,7 @@ app.static("/", "./UI/")
 
 
 @app.route('/', methods=frozenset({"GET"}))
-async def static(request: Request):
+async def static(_: Request):
     file = os.path.join("./UI/", "index.htm")
     mime = mimetypes.MimeTypes().guess_type(file)[0]
 
@@ -47,45 +47,42 @@ async def static(request: Request):
 
 
 @app.route("/start-download", methods=frozenset({"POST"}))
-async def start(request):
-    ctype, pdict = cgi.parse_header(request.headers.get('Content-Type'))
-    # ctype, pdict = cgi.parse_header(self.headers['content-type'])
-    pdict['boundary'] = bytes(pdict['boundary'], "utf-8")
+async def start(request: Request):
+    headers = request.headers
+    forms = request.form
 
-    content_len = int(request.headers.get('Content-length'))
-    pdict['CONTENT-LENGTH'] = content_len
+    headers['boundary'] = bytes(headers['boundary'], "utf-8")
+    headers['CONTENT-LENGTH'] = int(request.headers.get('Content-length'))
 
-    postvars = request.form
+    output_type = forms['outputType'][0]
+    output_scale = int(forms['outputScale'][0])
+    output_directory = forms['outputDirectory'][0]
+    output_file = forms['outputFile'][0]
+    min_zoom = int(forms['minZoom'][0])
+    max_zoom = int(forms['maxZoom'][0])
+    timestamp = int(forms['timestamp'][0])
+    bounds = forms['bounds'][0]
+    bounds_array = map(float, bounds.split(","))
+    center = forms['center'][0]
+    center_array = map(float, center.split(","))
 
-    outputType = postvars['outputType'][0]
-    outputScale = int(postvars['outputScale'][0])
-    outputDirectory = postvars['outputDirectory'][0]
-    outputFile = postvars['outputFile'][0]
-    minZoom = int(postvars['minZoom'][0])
-    maxZoom = int(postvars['maxZoom'][0])
-    timestamp = int(postvars['timestamp'][0])
-    bounds = postvars['bounds'][0]
-    boundsArray = map(float, bounds.split(","))
-    center = postvars['center'][0]
-    centerArray = map(float, center.split(","))
-
-    replaceMap = {
+    replace_map = {
         "timestamp": str(timestamp),
     }
 
-    for key, value in replaceMap.items():
-        newKey = str("{" + str(key) + "}")
-        outputDirectory = outputDirectory.replace(newKey, value)
-        outputFile = outputFile.replace(newKey, value)
+    for key, value in replace_map.items():
+        new_key = str("{" + str(key) + "}")
+        output_directory = output_directory.replace(new_key, value)
+        output_file = output_file.replace(new_key, value)
 
-    filePath = os.path.join("output", outputDirectory, outputFile)
+    file_path = os.path.join("output", output_directory, output_file)
 
-    writerByType(outputType).addMetadata(lock, os.path.join("output", outputDirectory), filePath,
-                                         outputFile, "Map Tiles Downloader via AliFlux", "png",
-                                         boundsArray, centerArray, minZoom, maxZoom, "mercator",
-                                         256 * outputScale)
+    writer_by_type(output_type).add_metadata(lock, os.path.join("output", output_directory), file_path,
+                                             output_file, "Map Tiles Downloader via AliFlux", "png",
+                                             bounds_array, center_array, min_zoom, max_zoom, "mercator",
+                                             256 * output_scale)
 
-    result = {}
+    result = dict()
     result["code"] = 200
     result["message"] = 'Metadata written'
 
@@ -94,43 +91,40 @@ async def start(request):
 
 
 @app.route("/end-download", methods=frozenset({"POST"}))
-async def end(request):
-    ctype, pdict = cgi.parse_header(request.headers.get('Content-Type'))
-    # ctype, pdict = cgi.parse_header(self.headers['content-type'])
-    pdict['boundary'] = bytes(pdict['boundary'], "utf-8")
+async def end(request: Request):
+    headers = request.headers
+    forms = request.form
 
-    content_len = int(request.headers.get('Content-length'))
-    pdict['CONTENT-LENGTH'] = content_len
+    headers['boundary'] = bytes(headers['boundary'], "utf-8")
+    headers['CONTENT-LENGTH'] = int(headers.get('Content-length'))
 
-    postvars = request.form
+    output_type = forms['outputType'][0]
+    output_scale = int(forms['outputScale'][0])
+    output_directory = forms['outputDirectory'][0]
+    output_file = forms['outputFile'][0]
+    min_zoom = int(forms['minZoom'][0])
+    max_zoom = int(forms['maxZoom'][0])
+    timestamp = int(forms['timestamp'][0])
+    bounds = forms['bounds'][0]
+    bounds_array = map(float, bounds.split(","))
+    center = forms['center'][0]
+    center_array = map(float, center.split(","))
 
-    outputType = postvars['outputType'][0]
-    outputScale = int(postvars['outputScale'][0])
-    outputDirectory = postvars['outputDirectory'][0]
-    outputFile = postvars['outputFile'][0]
-    minZoom = int(postvars['minZoom'][0])
-    maxZoom = int(postvars['maxZoom'][0])
-    timestamp = int(postvars['timestamp'][0])
-    bounds = postvars['bounds'][0]
-    boundsArray = map(float, bounds.split(","))
-    center = postvars['center'][0]
-    centerArray = map(float, center.split(","))
-
-    replaceMap = {
+    replace_map = {
         "timestamp": str(timestamp),
     }
 
-    for key, value in replaceMap.items():
-        newKey = str("{" + str(key) + "}")
-        outputDirectory = outputDirectory.replace(newKey, value)
-        outputFile = outputFile.replace(newKey, value)
+    for key, value in replace_map.items():
+        new_key = str("{" + str(key) + "}")
+        output_directory = output_directory.replace(new_key, value)
+        output_file = output_file.replace(new_key, value)
 
-    filePath = os.path.join("output", outputDirectory, outputFile)
+    file_path = os.path.join("output", output_directory, output_file)
 
-    writerByType(outputType).close(lock, os.path.join("output", outputDirectory), filePath, minZoom,
-                                   maxZoom)
+    writer_by_type(output_type).close(lock, os.path.join("output", output_directory), file_path, min_zoom,
+                                      max_zoom)
 
-    result = {}
+    result = dict()
     result["code"] = 200
     result["message"] = 'Downloaded ended'
 
@@ -140,27 +134,24 @@ async def end(request):
 
 @app.route("/download-tile", methods=frozenset({"POST"}))
 async def down(request: Request):
-    ctype, pdict = cgi.parse_header(request.headers.get('Content-Type'))
-    # ctype, pdict = cgi.parse_header(self.headers['content-type'])
-    pdict['boundary'] = bytes(pdict['boundary'], "utf-8")
+    headers = request.headers
+    forms = request.form
 
-    content_len = int(request.headers.get('Content-length'))
-    pdict['CONTENT-LENGTH'] = content_len
+    headers['boundary'] = bytes(headers['boundary'], "utf-8")
+    headers['CONTENT-LENGTH'] = int(headers.get('Content-length'))
 
-    postvars = request.form
+    x = int(forms['x'][0])
+    y = int(forms['y'][0])
+    z = int(forms['z'][0])
+    quad = forms['quad'][0]
+    timestamp = int(forms['timestamp'][0])
+    output_directory = forms['outputDirectory'][0]
+    output_file = forms['outputFile'][0]
+    output_type = forms['outputType'][0]
+    output_scale = int(forms['outputScale'][0])
+    source = forms['source'][0]
 
-    x = int(postvars['x'][0])
-    y = int(postvars['y'][0])
-    z = int(postvars['z'][0])
-    quad = postvars['quad'][0]
-    timestamp = int(postvars['timestamp'][0])
-    outputDirectory = postvars['outputDirectory'][0]
-    outputFile = postvars['outputFile'][0]
-    outputType = postvars['outputType'][0]
-    outputScale = int(postvars['outputScale'][0])
-    source = postvars['source'][0]
-
-    replaceMap = {
+    replace_map = {
         "x": str(x),
         "y": str(y),
         "z": str(z),
@@ -168,40 +159,40 @@ async def down(request: Request):
         "timestamp": str(timestamp),
     }
 
-    for key, value in replaceMap.items():
-        newKey = str("{" + str(key) + "}")
-        outputDirectory = outputDirectory.replace(newKey, value)
-        outputFile = outputFile.replace(newKey, value)
+    for key, value in replace_map.items():
+        new_key = str("{" + str(key) + "}")
+        output_directory = output_directory.replace(new_key, value)
+        output_file = output_file.replace(new_key, value)
 
     result = dict(message="ok")
 
-    filePath = os.path.join("output", outputDirectory, outputFile)
+    file_path = os.path.join("output", output_directory, output_file)
 
-    if writerByType(outputType).exists(filePath, x, y, z):
+    if writer_by_type(output_type).exists(file_path, x, y, z):
         result["code"] = 200
 
-        print("EXISTS: " + filePath)
+        print("EXISTS: " + file_path)
     else:
 
-        tempFile = randomString() + ".png"
-        tempFilePath = os.path.join("temp", tempFile)
+        temp_file = random_string() + ".png"
+        temp_file_path = os.path.join("temp", temp_file)
 
         # 使用tempfile的原因是他支持缩放
-        result["code"] = await Utils.as_downloadFileScaled(source, tempFilePath, x, y, z, outputScale)
+        result["code"] = await async_download_file_scaled(source, temp_file_path, x, y, z, output_scale)
 
         print("HIT: " + source + "\n" + "RETURN: " + str(result["code"]))
 
-        if os.path.isfile(tempFilePath):
-            writerByType(outputType).addTile(lock, filePath, tempFilePath, x, y, z, outputScale)
+        if os.path.isfile(temp_file_path):
+            writer_by_type(output_type).add_tile(lock, file_path, temp_file_path, x, y, z, output_scale)
 
             # 注释掉这一段, 让前段不再展示图片
             # async with AIOFile(tempFilePath, 'rb') as image_file:
             #     result["image"] = base64.b64encode(await image_file.read()).decode("utf-8")
 
-            os.remove(tempFilePath)
+            os.remove(temp_file_path)
 
             result["message"] = 'url, write'
-            print("SAVE: " + filePath)
+            print("SAVE: " + file_path)
 
         else:
             result["message"] = 'Download failed'
@@ -210,8 +201,17 @@ async def down(request: Request):
 
 
 if __name__ == '__main__':
-    app.run(
-        port=8080,
-        # workers=os.cpu_count() * 2 + 1,
-        access_log=False
-    )
+    env = os.environ
+
+    ensure_base_dir()
+
+    workers = 1
+    if env.get("workers", ""):
+        worker_string = env.get("workers")  # type: str
+        if worker_string.isdigit():
+            workers = int(workers)
+
+        if worker_string == "auto":
+            workers = os.cpu_count() * 2 + 1
+
+    app.run(port=8080, workers=workers, access_log=False)

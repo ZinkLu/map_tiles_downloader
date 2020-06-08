@@ -16,29 +16,29 @@
 
 2. src下有三种不同的server可供选择, 他们的依赖不同:
 
-    1. thread_server: `pip install pillow`
+    ~~1. thread_server: `pip install pillow`~~ 已废弃
 
-    2. sanic_server: `pip install sanic tornado aiofile`
+    2. sanic_server: `pip install sanic httpx aiofile`
 
-    3. tornado_server: `pip install tornado aiofile`
+    ~~3. tornado_server: `pip install tornado aiofile`~~ 已废弃
 
 ### 使用
 
 1. 启动server
 
-    1. thread_server: `python thread_server`
+    1. ~~thread_server: `python thread_server`~~ 以废弃
 
     2. sanic_server: `python sanic_server`
 
-    3. tornado_server: `python tornado_server`
+    ~~3. tornado_server: `python tornado_server`~~ 已废弃
 
 2. 然后打开`http://localhost:8080`
 
 有什么不同?
 
-> thread_server 在每一个请求进来的时候创建一个线程, 越下载越慢..
+> ~~thread_server 在每一个请求进来的时候创建一个线程, 越下载越慢..~~已废弃
 >
-> sanic_server/tornado_server 在处理下载和文件存放的时候都是用了Python异步IO的特性, 丝滑顺畅
+> sanic_server 在处理下载和文件存放的时候都是用了Python异步IO的特性, 丝滑顺畅
 
 ### 注意事项
 

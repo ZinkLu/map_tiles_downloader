@@ -123,8 +123,6 @@ def download_file(url, destination, x, y, z):
 async def async_download_file(url, destination, x, y, z):
     url = qualify_url(url, x, y, z)
 
-    code = 0
-
     # monkey patching SSL certificate issue
     # DONT use it in a prod/sensitive environment
     ssl._create_default_https_context = ssl._create_unverified_context
@@ -134,14 +132,9 @@ async def async_download_file(url, destination, x, y, z):
             async with httpx.AsyncClient() as client:
                 res = await client.get(url)
                 await f.write(res.content)
-        # path, response = urllib.request.urlretrieve(url, destination)
         code = 200
-    except urllib.error.URLError as e:
-        if not hasattr(e, "code"):
-            print(e)
-            code = -1
-        else:
-            code = e.code
+    except httpx.HTTPError:
+        code = -1
 
     return code
 
